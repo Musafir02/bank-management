@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>All Transactions - BankApp</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<nav class="navbar">
+    <span class="brand">🏦 BankApp — Transactions</span>
+    <div class="nav-right">
+        <a href="{{ url_for('admin_dashboard') }}">
+            <button class="btn-logout">← Dashboard</button>
+        </a>
+        <a href="{{ url_for('logout') }}">
+            <button class="btn-logout">Logout</button>
+        </a>
+    </div>
+</nav>
+
+<div class="page">
+    <p class="page-title">All Transactions</p>
+
+    <div class="card">
+        {% if transactions %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Customer</th>
+                    <th>Account No.</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Date & Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td style="color:#a0aec0">{{ t.id }}</td>
+                    <td>{{ t.full_name }}</td>
+                    <td style="font-family: monospace; font-size: 13px;">{{ t.account_number }}</td>
+                    <td><span class="badge badge-{{ t.type }}">{{ t.type }}</span></td>
+                    <td><strong>₹{{ "%.2f"|format(t.amount) }}</strong></td>
+                    <td style="color:#718096; font-size:13px;">{{ t.created_at|format_datetime }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div class="empty">No transactions yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+</body>
+</html>

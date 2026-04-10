@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - BankApp</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <span class="brand">🏦 BankApp — Admin</span>
+    <div class="nav-right">
+        <span>{{ session['username'] }}</span>
+        <a href="{{ url_for('admin_transactions') }}">
+            <button class="btn-logout">All Transactions</button>
+        </a>
+        <a href="{{ url_for('logout') }}">
+            <button class="btn-logout">Logout</button>
+        </a>
+    </div>
+</nav>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-messages">
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endwith %}
+
+<div class="page">
+    <p class="page-title">Customer Management</p>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-value">{{ customers | length }}</div>
+            <div class="stat-label">Total Customers</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">
+                ₹{{ "%.2f"|format(customers | sum(attribute='balance') if customers and customers[0].balance else 0) }}
+            </div>
+            <div class="stat-label">Total Balance in Bank</div>
+        </div>
+    </div>
+
+    <!-- Add Customer Button -->
+    <div style="margin-bottom: 16px;">
+        <button class="btn btn-primary" onclick="openModal('addModal')">+ Add Customer</button>
+    </div>
+
+    <!-- Customers Table -->
+    <div class="card">
+        <div class="card-title">All Customers</div>
+        {% if customers %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Account No.</th>
+                    <th>Balance</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                <tr>
+                    <td><strong>{{ c.full_name }}</strong></td>
+                    <td>{{ c.email or '—' }}</td>
+                    <td>{{ c.phone or '—' }}</td>
+                    <td style="font-family: monospace; font-size: 13px;">{{ c.account_number or '—' }}</td>
+                    <td><strong>₹{{ "%.2f"|format(c.balance or 0) }}</strong></td>
+                    <td>
+                        <form method="POST" action="/admin/delete_customer/{{ c.id }}"
+                              onsubmit="return confirm('Delete this customer?')">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div class="empty">No customers yet. Add one to get started.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Customer Modal -->
+<div class="modal-overlay" id="addModal">
+    <div class="modal">
+        <div class="modal-title">Add New Customer</div>
+        <form method="POST" action="/admin/add_customer">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" name="full_name" required placeholder="Rahul Sharma">
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" name="phone" placeholder="9876543210">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" placeholder="rahul@email.com">
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Login Username</label>
+                    <input type="text" name="username" required placeholder="rahul123">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" required placeholder="••••••••">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('addModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Customer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id)  { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// Close modal when clicking outside
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function(e) {
+        if (e.target === this) closeModal(this.id);
+    });
+});
+</script>
+
+</body>
+</html>
