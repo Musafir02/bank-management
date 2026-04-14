@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, session, redirect, url_for, flash
 from werkzeug.security import check_password_hash, generate_password_hash
 import sqlite3, random
+import re
+from math import isfinite
 from datetime import datetime
 
 app = Flask(__name__)
@@ -21,7 +23,7 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
+            username TEXT NOT NULL CHECK (username <> '' AND username NOT GLOB '*[^A-Za-z_]*'),
             password TEXT NOT NULL,
             role TEXT NOT NULL
         )
@@ -31,9 +33,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER UNIQUE,
-            full_name TEXT NOT NULL,
+            full_name TEXT NOT NULL CHECK (full_name <> '' AND full_name NOT GLOB '*[^A-Za-z ]*'),
             email TEXT,
-            phone TEXT,
+            phone TEXT CHECK (phone IS NULL OR phone = '' OR phone GLOB '[0-9]*'),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
@@ -43,7 +45,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER,
             account_number TEXT UNIQUE NOT NULL,
-            balance REAL DEFAULT 0.00,
+            balance REAL NOT NULL DEFAULT 0.00 CHECK (balance >= 0),
             created_at TEXT DEFAULT (DATETIME('now')),
             FOREIGN KEY (customer_id) REFERENCES customers(id)
         )
@@ -54,7 +56,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             account_id INTEGER,
             type TEXT NOT NULL,
-            amount REAL NOT NULL,
+            amount REAL NOT NULL CHECK (amount > 0),
             related_account_id INTEGER DEFAULT NULL,
             created_at TEXT DEFAULT (DATETIME('now')),
             FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -80,6 +82,29 @@ def is_customer():
 
 def generate_account_number():
     return "ACC" + str(random.randint(1000000000, 9999999999))
+
+def is_valid_username(value):
+    return bool(re.fullmatch(r"[A-Za-z_]+", str(value or "").strip()))
+
+def is_valid_full_name(value):
+    return bool(re.fullmatch(r"[A-Za-z ]+", str(value or "").strip()))
+
+def is_valid_phone(value):
+    phone = str(value or "").strip()
+    if phone == "":
+        return True
+    return bool(re.fullmatch(r"[0-9]{10}", phone))
+
+def parse_positive_amount(raw_amount):
+    try:
+        amount = float(raw_amount)
+    except (TypeError, ValueError):
+        return None
+
+    if not isfinite(amount) or amount <= 0:
+        return None
+
+    return amount
 
 @app.template_filter("format_datetime")
 def format_dt(value):
@@ -144,11 +169,23 @@ def add_customer():
     if not is_admin():
         return redirect(url_for("login"))
 
-    full_name = request.form["full_name"]
-    email     = request.form["email"]
-    phone     = request.form["phone"]
-    username  = request.form["username"]
+    full_name = request.form["full_name"].strip()
+    email     = request.form["email"].strip()
+    phone     = request.form["phone"].strip()
+    username  = request.form["username"].strip()
     password  = request.form["password"]
+
+    if not is_valid_username(username):
+        flash("Username must contain only letters or underscore", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    if not is_valid_full_name(full_name):
+        flash("Full name must contain only letters and spaces", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    if not is_valid_phone(phone):
+        flash("Phone must contain 10 digits", "error")
+        return redirect(url_for("admin_dashboard"))
 
     conn = get_db()
 
@@ -239,8 +276,8 @@ def deposit():
     if not is_customer():
         return redirect(url_for("login"))
 
-    amount = float(request.form["amount"])
-    if amount <= 0:
+    amount = parse_positive_amount(request.form.get("amount"))
+    if amount is None:
         flash("Amount must be positive", "error")
         return redirect(url_for("customer_dashboard"))
 
@@ -264,7 +301,10 @@ def withdraw():
     if not is_customer():
         return redirect(url_for("login"))
 
-    amount = float(request.form["amount"])
+    amount = parse_positive_amount(request.form.get("amount"))
+    if amount is None:
+        flash("Invalid amount", "error")
+        return redirect(url_for("customer_dashboard"))
 
     conn = get_db()
     acc = conn.execute("""
@@ -291,8 +331,12 @@ def transfer():
     if not is_customer():
         return redirect(url_for("login"))
 
-    to_account_number = request.form["to_account"]
-    amount = float(request.form["amount"])
+    to_account_number = request.form["to_account"].strip()
+    amount = parse_positive_amount(request.form.get("amount"))
+
+    if amount is None:
+        flash("Invalid amount", "error")
+        return redirect(url_for("customer_dashboard"))
 
     conn = get_db()
     from_acc = conn.execute("""
