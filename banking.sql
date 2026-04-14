@@ -5,19 +5,20 @@
 CREATE DATABASE IF NOT EXISTS banking_db;
 USE banking_db;
 
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL CHECK (username REGEXP '^[A-Za-z_]+$'),
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'customer') NOT NULL
+    role TEXT NOT NULL
 );
+
 
 CREATE TABLE customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT UNIQUE,
-    full_name VARCHAR(100) NOT NULL,
+    full_name VARCHAR(100) NOT NULL CHECK (full_name REGEXP '^[A-Za-z ]+$'),
     email VARCHAR(100),
-    phone VARCHAR(15),
+    phone VARCHAR(15) CHECK (phone IS NULL OR phone = '' OR phone REGEXP '^[0-9]{7,15}$'),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -25,7 +26,7 @@ CREATE TABLE accounts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     customer_id INT,
     account_number VARCHAR(20) UNIQUE NOT NULL,
-    balance DECIMAL(10,2) DEFAULT 0.00,
+    balance DECIMAL(10,2) DEFAULT 0.00 CHECK (balance >= 0),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
@@ -34,7 +35,7 @@ CREATE TABLE transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     account_id INT,
     type ENUM('deposit', 'withdraw', 'transfer') NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
     related_account_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (account_id) REFERENCES accounts(id)
